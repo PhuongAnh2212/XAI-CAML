@@ -1,29 +1,23 @@
 import os
-import torch
-from torch.autograd import Variable
-from PIL import Image
-from trainer_exchange import trainer
-from torchvision import transforms
 import argparse
-import csv
 import numpy as np
 import kmapper as km
 import sklearn
-import matplotlib.pyplot as plt
 import pandas as pd
 
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--latentAB_save_path',type=str,default='/code/CL_Analysis/results/testAB_CL_codes_extraction_results.csv')  ###where the class-associated codes extracted from the images and the images label are recorded
-parser.add_argument('--html_name01',type=str,default='/results/topological_analysis_custom_image_name_result.html')  ###topological analysis results
-parser.add_argument('--html_name02',type=str,default='/results/topological_analysis_custom_labels_result.html') ###topological analysis results
+parser.add_argument('--output_dir',type=str,default='CL_Analysis/results')
+parser.add_argument('--latentAB_save_path','--latent_csv',dest='latentAB_save_path',type=str,default=None)  ###where the class-associated codes extracted from the images and the images label are recorded
+parser.add_argument('--html_name01',type=str,default=None)  ###topological analysis results
+parser.add_argument('--html_name02',type=str,default=None) ###topological analysis results
 
 
 opts = parser.parse_args()
 
 
-latentAB_save_path=opts.latentAB_save_path
+latentAB_save_path=opts.latentAB_save_path or os.path.join(opts.output_dir, 'testAB_CL_codes_extraction_results.csv')
 
 df = pd.read_csv(latentAB_save_path)
 
@@ -40,7 +34,7 @@ tooltip_s = np.array(df["image_name"])
 mapper = km.KeplerMapper(verbose=2)
 
 # Fit and transform data
-projected_data = mapper.fit_transform(X, projection=sklearn.manifold.TSNE(n_iter=500))
+projected_data = mapper.fit_transform(X, projection=sklearn.manifold.TSNE(max_iter=500))
 
 # Create the graph (we cluster on the projected data and suffer projection loss)
 graph = mapper.map(
@@ -53,7 +47,8 @@ graph = mapper.map(
 print("Output graph examples to html")
 
 # Tooltips with image data for every cluster member
-html_name01=opts.html_name01
+html_name01=opts.html_name01 or os.path.join(opts.output_dir, 'topological_analysis_custom_image_name_result.html')
+os.makedirs(os.path.dirname(os.path.abspath(html_name01)), exist_ok=True)
 mapper.visualize(
     graph,
     title="latent Mapper",
@@ -62,7 +57,8 @@ mapper.visualize(
 )
 
 # Tooltips with the target y-labels for every cluster member
-html_name02=opts.html_name02
+html_name02=opts.html_name02 or os.path.join(opts.output_dir, 'topological_analysis_custom_labels_result.html')
+os.makedirs(os.path.dirname(os.path.abspath(html_name02)), exist_ok=True)
 mapper.visualize(
     graph,
     title="latent Mapper",
@@ -70,7 +66,10 @@ mapper.visualize(
     custom_tooltips=y,
 )
 
-# Matplotlib examples
-km.draw_matplotlib(graph, layout="spring")
-plt.show()
+try:
+    import matplotlib.pyplot as plt
 
+    km.draw_matplotlib(graph, layout="spring")
+    plt.close()
+except ImportError:
+    print("matplotlib is not installed; skipped optional Mapper matplotlib plot.")

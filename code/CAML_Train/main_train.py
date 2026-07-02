@@ -1,40 +1,77 @@
 import argparse
-from trainer_exchange import trainer
-import torch
 try:
     from itertools import izip as zip
 except ImportError:
     pass
 import sys
 from random import shuffle
-from torchvision import transforms
-from data import ImageFolder
-from torch.utils.data import DataLoader
-
-import torchvision.utils as vutils
 import os
+
+
+def resolve_data_root(data_root):
+    if os.path.isdir(data_root):
+        return data_root
+    parent_candidate = os.path.join('..', data_root)
+    if os.path.isdir(parent_candidate):
+        return parent_candidate
+    return data_root
+
+
+def resolve_data_subdir(data_root, explicit_path, preferred_name, fallback_name):
+    if explicit_path:
+        return explicit_path
+    preferred_path = os.path.join(data_root, preferred_name)
+    if os.path.isdir(preferred_path):
+        return preferred_path
+    fallback_path = os.path.join(data_root, fallback_name)
+    return fallback_path
+
+
+def print_dataset_debug(name, dataset):
+    print(name + ' size:', len(dataset))
+    for index, path in enumerate(dataset.imgs[:5]):
+        image_name = os.path.basename(path)
+        print(name + ' sample ' + str(index) + ':', image_name, 'label=' + dataset.label_all[image_name])
+
+
+def load_training_dependencies():
+    global torch, transforms, ImageFolder, DataLoader, vutils, trainer
+    try:
+        import torch
+        from torchvision import transforms
+        from data import ImageFolder
+        from torch.utils.data import DataLoader
+        import torchvision.utils as vutils
+        from trainer_exchange import trainer
+    except ImportError as exc:
+        print('CAML training dependency import failed:', exc)
+        print('Install PyTorch and torchvision in this Python environment before training.')
+        sys.exit(1)
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cuda',type=str,default='True',help='Use gpu or not')
-parser.add_argument('--trainA_img_path',type=str,default='/data/Brain Tumor2/trainA_img/')  ###training images with class A are placed into this folder
-parser.add_argument('--trainB_img_path',type=str,default='/data/Brain Tumor2/trainB_img/')  ###training images with class B are placed into this folder
-parser.add_argument('--testA_img_path',type=str,default='/data/Brain Tumor2/testA_img/') ###testing images with class A are placed into this folder
-parser.add_argument('--testB_img_path',type=str,default='/data/Brain Tumor2/testB_img/') ###testing images with class B are placed into this folder
-parser.add_argument('--train_label_file',type=str,default='/data/Brain Tumor2/trainAB_img-name_label.txt')  #### name and label of each training image are presented in each line in this file, like the first line:"brain_image_name1 1", where 1 refers to the abnormal class.
-parser.add_argument('--test_label_file',type=str,default='/data/Brain Tumor2/testAB_img-name_label.txt')
+parser.add_argument('--data_root',type=str,default='data/Brain_Tumor2',help='Root folder containing CAML train/test image folders and label txt files')
+parser.add_argument('--output_dir',type=str,default='results',help='Root output folder for models and generated training previews')
+parser.add_argument('--smoke_test',type=str,default='False',help='Use Brain_smoke defaults and short training settings')
+parser.add_argument('--trainA_img_path','--trainA_path',dest='trainA_img_path',type=str,default=None)  ###training images with class A are placed into this folder
+parser.add_argument('--trainB_img_path','--trainB_path',dest='trainB_img_path',type=str,default=None)  ###training images with class B are placed into this folder
+parser.add_argument('--testA_img_path','--testA_path',dest='testA_img_path',type=str,default=None) ###testing images with class A are placed into this folder
+parser.add_argument('--testB_img_path','--testB_path',dest='testB_img_path',type=str,default=None) ###testing images with class B are placed into this folder
+parser.add_argument('--train_label_file','--label_train',dest='train_label_file',type=str,default=None)  #### name and label of each training image are presented in each line in this file, like the first line:"brain_image_name1 1", where 1 refers to the abnormal class.
+parser.add_argument('--test_label_file','--label_test',dest='test_label_file',type=str,default=None)
 parser.add_argument('--style_dim',type=int,default=8) ### the dimension setting of the class-associated codes
 parser.add_argument('--train_is',type=str,default='True')
 
-if parser.parse_args().train_is=='True':
+if parser.parse_known_args()[0].train_is=='True':
     parser.add_argument('--batch_size',type=int,default=1)
     parser.add_argument('--num_workers',type=int,default=4)
     parser.add_argument('--model_save_iter',type=int,default=2000)
-    parser.add_argument('--model_save_path',type=str,default='/results/models/')
+    parser.add_argument('--model_save_path',type=str,default=None)
     parser.add_argument('--display_size',type=int,default=16)
     parser.add_argument('--image_save_iter',type=int,default=2000)
-    parser.add_argument('--image_save_path',type=str,default='/results/images_display/',help='display of generative cases')
-    parser.add_argument('--train_max_iter',type=int,default=500000)
+    parser.add_argument('--image_save_path',type=str,default=None,help='display of generative cases')
+    parser.add_argument('--train_max_iter','--max_iter',dest='train_max_iter',type=int,default=500000)
     parser.add_argument('--learning_rate',type=float,default=0.0001)
     parser.add_argument('--beta1',type=float,default=0.5)
     parser.add_argument('--beta2',type=float,default=0.999)
@@ -51,12 +88,44 @@ if parser.parse_args().train_is=='True':
 
 opts = parser.parse_args()
 
-if opts.cuda=='True':
+if opts.smoke_test == 'True':
+    if opts.data_root == 'data/Brain_Tumor2':
+        opts.data_root = 'data/Brain_smoke'
+    if opts.train_is == 'True':
+        opts.batch_size = 2
+        opts.train_max_iter = 5
+        opts.model_save_iter = 1
+        opts.image_save_iter = 1
+        opts.num_workers = 0
+        opts.display_size = 2
+
+opts.data_root = resolve_data_root(opts.data_root)
+opts.trainA_img_path = resolve_data_subdir(opts.data_root, opts.trainA_img_path, 'trainA_img', 'trainA')
+opts.trainB_img_path = resolve_data_subdir(opts.data_root, opts.trainB_img_path, 'trainB_img', 'trainB')
+opts.testA_img_path = resolve_data_subdir(opts.data_root, opts.testA_img_path, 'testA_img', 'testA')
+opts.testB_img_path = resolve_data_subdir(opts.data_root, opts.testB_img_path, 'testB_img', 'testB')
+opts.train_label_file = opts.train_label_file or os.path.join(opts.data_root, 'trainAB_img-name_label.txt')
+opts.test_label_file = opts.test_label_file or os.path.join(opts.data_root, 'testAB_img-name_label.txt')
+if opts.train_is == 'True':
+    opts.model_save_path = opts.model_save_path or os.path.join(opts.output_dir, 'models')
+    opts.image_save_path = opts.image_save_path or os.path.join(opts.output_dir, 'images_display')
+
+print('Data root:', opts.data_root)
+print('TrainA:', opts.trainA_img_path)
+print('TrainB:', opts.trainB_img_path)
+print('TestA:', opts.testA_img_path)
+print('TestB:', opts.testB_img_path)
+print('Train labels:', opts.train_label_file)
+print('Test labels:', opts.test_label_file)
+
+load_training_dependencies()
+
+if opts.cuda=='True' and torch.cuda.is_available():
     device = torch.device('cuda:0')
 else:
     device = torch.device('cpu')
 
-optim_para={'lr':opts.learning_rate,'lr_step_size':int(opts.train_max_iter/10),'beta1':opts.beta1,'beta2':opts.beta2,'weight_decay':opts.weight_decay}
+optim_para={'lr':opts.learning_rate,'lr_step_size':max(1, int(opts.train_max_iter/10)),'beta1':opts.beta1,'beta2':opts.beta2,'weight_decay':opts.weight_decay}
 gen_loss_weight_para={'rec_x_w':opts.rec_x_w,'rec_c_w':opts.rec_c_w,'rec_s_w':opts.rec_s_w,'cyc_w':opts.cyc_w,'gen_dis_w':opts.gen_dis_w,'gen_cla_w':opts.gen_cla_w}
 dis_loss_weight_para={'dis_dis_w':opts.dis_dis_w,'dis_cla_w':opts.dis_cla_w}
 
@@ -92,6 +161,10 @@ dataset_trainA=ImageFolder(trainA_img_path, train_label_file,transform=transform
 dataset_trainB=ImageFolder(trainB_img_path, train_label_file,transform=transform1)
 dataset_testA=ImageFolder(testA_img_path, test_label_file,transform=transform2)
 dataset_testB=ImageFolder(testB_img_path, test_label_file,transform=transform2)
+print_dataset_debug('TrainA', dataset_trainA)
+print_dataset_debug('TrainB', dataset_trainB)
+print_dataset_debug('TestA', dataset_testA)
+print_dataset_debug('TestB', dataset_testB)
 batch_size=opts.batch_size
 num_workers=opts.num_workers
 train_loader_a=DataLoader(dataset=dataset_trainA, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=num_workers)
@@ -228,4 +301,5 @@ if __name__=='__main__':
 
             print('Finished training: '+str(iterations)+'/'+str(max_iter))
             if iterations >= max_iter:
-                sys.exit('Training finish')
+                print('Training finish')
+                sys.exit(0)

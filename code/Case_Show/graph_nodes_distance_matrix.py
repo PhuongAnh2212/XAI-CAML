@@ -14,18 +14,29 @@ import csv
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cuda',type=str,default='True',help='Use gpu or not')
-parser.add_argument('--Nodes_images_path',type=str,default='/code/Case_Show/Nodes_images_name.txt')  ####where images involved into each node within the topological graph are recorded
-parser.add_argument('--AB_img_path',type=str,default='/data/Brain Tumor2/testAB_img/') ###images involved in the nodes of the topology graph are all placed in this folder
-parser.add_argument('--Nodes_connection_save_path',type=str,default='/results/Nodes_connection.txt')
-parser.add_argument('--Nodes_codes_center_save_path',type=str,default='/results/Nodes_codes_center.csv')
-parser.add_argument('--Nodes_all_distance_save_path',type=str,default='/results/Nodes_all_distance.csv')
-parser.add_argument('--Nodes_connection_distance_save_path',type=str,default='/results/Nodes_connection_distance.csv')
-parser.add_argument('--CAML_trained_gen_model_path',type=str,default='/code/trained_models/CAML_brain_trained_model.pt')
+parser.add_argument('--data_root',type=str,default='data/Brain_Tumor2')
+parser.add_argument('--output_dir',type=str,default='Case_Show/results')
+parser.add_argument('--Nodes_images_path',type=str,default='Case_Show/Nodes_images_name.txt')  ####where images involved into each node within the topological graph are recorded
+parser.add_argument('--AB_img_path','--image_dir',dest='AB_img_path',type=str,default=None) ###optional combined image folder
+parser.add_argument('--testA_path',type=str,default=None)
+parser.add_argument('--testB_path',type=str,default=None)
+parser.add_argument('--Nodes_connection_save_path',type=str,default=None)
+parser.add_argument('--Nodes_codes_center_save_path',type=str,default=None)
+parser.add_argument('--Nodes_all_distance_save_path',type=str,default=None)
+parser.add_argument('--Nodes_connection_distance_save_path',type=str,default=None)
+parser.add_argument('--CAML_trained_gen_model_path','--checkpoint_path','--checkpoint',dest='CAML_trained_gen_model_path',type=str,default='trained_models/CAML_brain_trained_model.pt')
 parser.add_argument('--style_dim',type=int,default=8)
 parser.add_argument('--train_is',type=str,default='False')
 opts = parser.parse_args()
 
-if opts.cuda=='True':
+opts.testA_path = opts.testA_path or os.path.join(opts.data_root, 'testA_img')
+opts.testB_path = opts.testB_path or os.path.join(opts.data_root, 'testB_img')
+opts.Nodes_connection_save_path = opts.Nodes_connection_save_path or os.path.join(opts.output_dir, 'Nodes_connection.txt')
+opts.Nodes_codes_center_save_path = opts.Nodes_codes_center_save_path or os.path.join(opts.output_dir, 'Nodes_codes_center.csv')
+opts.Nodes_all_distance_save_path = opts.Nodes_all_distance_save_path or os.path.join(opts.output_dir, 'Nodes_all_distance.csv')
+opts.Nodes_connection_distance_save_path = opts.Nodes_connection_distance_save_path or os.path.join(opts.output_dir, 'Nodes_connection_distance.csv')
+
+if opts.cuda=='True' and torch.cuda.is_available():
     device = torch.device('cuda:0')
 else:
     device = torch.device('cpu')
@@ -36,6 +47,8 @@ Nodes_connection_save_path=opts.Nodes_connection_save_path
 Nodes_codes_center_save_path=opts.Nodes_codes_center_save_path
 Nodes_all_distance_save_path=opts.Nodes_all_distance_save_path
 Nodes_connection_distance_save_path=opts.Nodes_connection_distance_save_path
+for save_path in [Nodes_connection_save_path, Nodes_codes_center_save_path, Nodes_all_distance_save_path, Nodes_connection_distance_save_path]:
+    os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
 
 
 def nodes_connection_get(Nodes_images_path=None,Nodes_connection_save_path=None):
@@ -143,10 +156,13 @@ transform = transforms.Compose(transform_list)
 ####class-associated codes extraction
 img_n=0
 s_tensor_all_dict={}
-AB_img_path=opts.AB_img_path
+image_dirs = [opts.AB_img_path] if opts.AB_img_path else [opts.testA_path, opts.testB_path]
+image_path_dict = {}
+for image_dir in image_dirs:
+    for img_name in os.listdir(image_dir):
+        image_path_dict[img_name] = os.path.join(image_dir, img_name)
 with torch.no_grad():
-    for img_name in os.listdir(AB_img_path):
-        example_path = AB_img_path + img_name
+    for img_name, example_path in image_path_dict.items():
         example_img = Variable(transform(Image.open(example_path).convert('RGB')).unsqueeze(0).to(device))
         c_A_ori, s_A_ori = encode(example_img)
         s_tensor_all_dict.update({img_name: s_A_ori})
@@ -245,4 +261,3 @@ with open(Nodes_connection_distance_save_path, 'w', newline='') as csvfile:
 
 
 print('Nodes codes centers connection distances finished')
-

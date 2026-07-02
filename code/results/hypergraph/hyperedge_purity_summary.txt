@@ -1,0 +1,12 @@
+vertices: 600
+hyperedges: 504
+mean_purity: 0.733947
+median_purity: 0.727273
+p25_purity: 0.636364
+p75_purity: 0.818182
+min_purity: 0.545455
+max_purity: 1.000000
+pure_hyperedges: 33
+bridge_hyperedges_35_65: 203
+mostly_normal_hyperedges: 221
+mostly_abnormal_hyperedges: 283

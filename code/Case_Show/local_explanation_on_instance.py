@@ -17,19 +17,27 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--cuda',type=str,default='True',help='Use gpu or not')
-parser.add_argument('--AB_img_path',type=str,default='/data/Brain Tumor2/testAB_img/') ###images involved in the nodes of the topology graph are all placed in this folder
-parser.add_argument('--Nodes_codes_center_save_path',type=str,default='/code/Case_Show/results/Nodes_codes_center.csv')
-parser.add_argument('--shortest_path_save_path',type=str,default='/code/Case_Show/results/AB_images_shortest_path_save.csv')
-parser.add_argument('--CAML_trained_gen_model_path',type=str,default='/code/trained_models/CAML_brain_trained_model.pt')
-parser.add_argument('--outer_classifier_path',type=str,default='/code/trained_models/blackbox_classifier(res50)_brain_trained_model.pth') #### black-box model whose behaviors on local instance will be explained
+parser.add_argument('--data_root',type=str,default='data/Brain_Tumor2')
+parser.add_argument('--output_dir',type=str,default='Case_Show/results')
+parser.add_argument('--AB_img_path','--image_dir',dest='AB_img_path',type=str,default=None) ###optional combined image folder
+parser.add_argument('--testA_path',type=str,default=None)
+parser.add_argument('--testB_path',type=str,default=None)
+parser.add_argument('--Nodes_codes_center_save_path',type=str,default=None)
+parser.add_argument('--shortest_path_save_path',type=str,default=None)
+parser.add_argument('--CAML_trained_gen_model_path','--checkpoint_path','--checkpoint',dest='CAML_trained_gen_model_path',type=str,default='trained_models/CAML_brain_trained_model.pt')
+parser.add_argument('--outer_classifier_path','--classifier',dest='outer_classifier_path',type=str,default='trained_models/blackbox_classifier(res50)_brain_trained_model.pth') #### black-box model whose behaviors on local instance will be explained
 parser.add_argument('--style_dim',type=int,default=8)
 parser.add_argument('--train_is',type=str,default='False')
-parser.add_argument('--generate_img_save_path',type=str,default='/results/generate_img_saliency_maps_for_local_explanation/')
+parser.add_argument('--generate_img_save_path',type=str,default=None)
+parser.add_argument('--source_image',type=str,default='z_86_01567.png')
+parser.add_argument('--target_image',type=str,default='z_86_01318.png')
 
 
 
-explained_case_name='z_86_01567.png'
-counter_reference_case_name='z_86_01318.png'
+opts = parser.parse_args()
+
+explained_case_name=opts.source_image
+counter_reference_case_name=opts.target_image
 
 
 # function of saliency map generation based the difference map
@@ -50,11 +58,10 @@ def heatmap_show(image,difference_map):
     return color_heatmap, img_with_heatmap
 
 
-opts = parser.parse_args()
-
-
 AB_img_path=opts.AB_img_path
-generate_img_save_path=opts.generate_img_save_path
+opts.testA_path = opts.testA_path or os.path.join(opts.data_root, 'testA_img')
+opts.testB_path = opts.testB_path or os.path.join(opts.data_root, 'testB_img')
+generate_img_save_path=opts.generate_img_save_path or os.path.join(opts.output_dir, 'generate_img_saliency_maps_for_local_explanation')
 
 
 ####data preprocessing
@@ -63,10 +70,10 @@ transform_list = [transforms.CenterCrop((256, 256))] + transform_list
 transform_list = [transforms.Resize(256)] + transform_list
 transform = transforms.Compose(transform_list)
 
-Nodes_codes_center_save_path=opts.Nodes_codes_center_save_path
+Nodes_codes_center_save_path=opts.Nodes_codes_center_save_path or os.path.join(opts.output_dir, 'Nodes_codes_center.csv')
 Nodes_codes_center_file=pd.read_csv(Nodes_codes_center_save_path)
 
-shortest_path_save_path=opts.shortest_path_save_path
+shortest_path_save_path=opts.shortest_path_save_path or os.path.join(opts.output_dir, 'AB_images_shortest_path_save.csv')
 shortest_path_file=pd.read_csv(shortest_path_save_path)
 
 try:
@@ -78,7 +85,7 @@ except:
     sys.exit(1)
 
 
-if opts.cuda=='True':
+if opts.cuda=='True' and torch.cuda.is_available():
     device = torch.device('cuda:0')
 else:
     device = torch.device('cpu')
@@ -98,7 +105,12 @@ decode = trainer.gen.decode
 if not os.path.exists(generate_img_save_path):
     os.makedirs(generate_img_save_path)
 
-explained_case_path = AB_img_path + explained_case_name
+if AB_img_path:
+    explained_case_path = os.path.join(AB_img_path, explained_case_name)
+else:
+    explained_case_path = os.path.join(opts.testA_path, explained_case_name)
+    if not os.path.exists(explained_case_path):
+        explained_case_path = os.path.join(opts.testB_path, explained_case_name)
 example_img=Variable(transform(Image.open(explained_case_path).convert('RGB')).unsqueeze(0).to(device))
 I_A, s = encode(example_img)
 
@@ -136,7 +148,6 @@ for i in range(len(shortest_path_nodes_list)):
         cv2.imwrite(generate_img_save_path + 'saliency_map_with_img_' + str(i) + 'd.jpg', colormap_with_img)
         print('Continuously changing generative examples with the final saliency map for local explanation is presented in ' + generate_img_save_path)
         break
-
 
 
 

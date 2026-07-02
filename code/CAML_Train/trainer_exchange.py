@@ -178,7 +178,11 @@ class trainer(nn.Module):
         gen_name = os.path.join(save_path, 'gen_%08d.pt' % (iterations + 1))
         dis_name = os.path.join(save_path, 'dis_%08d.pt' % (iterations + 1))
         opt_name = os.path.join(save_path, 'optimizer.pt')
+        latest_gen_name = os.path.join(save_path, 'gen_latest.pt')
+        latest_dis_name = os.path.join(save_path, 'dis_latest.pt')
         torch.save({'ab': self.gen.state_dict()}, gen_name)
         torch.save({'ab': self.dis_ab.state_dict()}, dis_name)
+        torch.save({'ab': self.gen.state_dict()}, latest_gen_name)
+        torch.save({'ab': self.dis_ab.state_dict()}, latest_dis_name)
         torch.save({'gen': self.gen_opt.state_dict(), 'dis': self.dis_opt.state_dict()}, opt_name)
 

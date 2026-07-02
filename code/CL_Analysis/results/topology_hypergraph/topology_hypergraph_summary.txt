@@ -1,0 +1,15 @@
+num_vertices: 802
+num_mapper_nodes: 39
+num_hyperedges: 39
+average_hyperedge_size: 68.743590
+isolated_vertices: 0
+label_distribution: {'0': 302, '1': 500}
+lambda_reg: 0.1
+smoothing_solver: solve
+smoothing_condition_number: 1.100000e+00
+output_hypergraph: /Users/pdpa/Desktop/Research/XAI-CAML/code/CL_Analysis/results/topology_hypergraph/hypergraph.json
+output_membership: /Users/pdpa/Desktop/Research/XAI-CAML/code/CL_Analysis/results/topology_hypergraph/hypergraph_membership.csv
+output_laplacian: /Users/pdpa/Desktop/Research/XAI-CAML/code/CL_Analysis/results/topology_hypergraph/hypergraph_laplacian.npy
+output_smoothed_latent: /Users/pdpa/Desktop/Research/XAI-CAML/code/CL_Analysis/results/topology_hypergraph/smoothed_latent.csv
+output_summary: /Users/pdpa/Desktop/Research/XAI-CAML/code/CL_Analysis/results/topology_hypergraph/topology_hypergraph_summary.txt
+output_plot: /Users/pdpa/Desktop/Research/XAI-CAML/code/CL_Analysis/results/topology_hypergraph/original_vs_smoothed_pca.png

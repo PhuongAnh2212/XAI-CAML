@@ -1,4 +1,5 @@
 import argparse
+import os
 import numpy as np
 import kmapper as km
 import sklearn
@@ -9,15 +10,17 @@ from sklearn import manifold
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--latentAB_save_path',type=str,default='/code/CL_Analysis/results/testAB_CL_codes_extraction_results.csv')  ###where the class-associated codes extracted from the images and the images label are recorded
-parser.add_argument('--tsne_save_path',type=str,default='/results/tsne_analysis_result.png')
+parser.add_argument('--output_dir',type=str,default='CL_Analysis/results')
+parser.add_argument('--latentAB_save_path','--latent_csv',dest='latentAB_save_path',type=str,default=None)  ###where the class-associated codes extracted from the images and the images label are recorded
+parser.add_argument('--tsne_save_path',type=str,default=None)
 
 
 opts = parser.parse_args()
 
-latentAB_save_path=opts.latentAB_save_path
+latentAB_save_path=opts.latentAB_save_path or os.path.join(opts.output_dir, 'testAB_CL_codes_extraction_results.csv')
 
-tsne_save_path=opts.tsne_save_path
+tsne_save_path=opts.tsne_save_path or os.path.join(opts.output_dir, 'tsne_analysis_result.png')
+os.makedirs(os.path.dirname(os.path.abspath(tsne_save_path)), exist_ok=True)
 
 df = pd.read_csv(latentAB_save_path)
 
@@ -68,7 +71,6 @@ for i in range(len(label_AB_list)):
 plt.axis('off')
 plt.savefig(tsne_save_path)
 plt.close()
-
 
 
 

@@ -3,33 +3,39 @@ import argparse
 import heapq
 import numpy as np
 import csv
+import os
 
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--AB_img_path',type=str,default='/data/Brain Tumor2/testAB_img/') ###images involved in the nodes of the topology graph are all placed in this folder
-parser.add_argument('--Nodes_codes_center_save_path',type=str,default='/code/Case_Show/results/Nodes_codes_center.csv')
-parser.add_argument('--Nodes_connection_distance_save_path',type=str,default='/code/Case_Show/results/Nodes_connection_distance.csv')
-parser.add_argument('--image_class_associated_codes_path',type=str,default='/code/CL_Analysis/results/testAB_CL_codes_extraction_results.csv')
-parser.add_argument('--shortest_path_save_path',type=str,default='/results/AB_images_shortest_path_save.csv')
+parser.add_argument('--data_root',type=str,default='data/Brain_Tumor2')
+parser.add_argument('--output_dir',type=str,default='Case_Show/results')
+parser.add_argument('--AB_img_path','--image_dir',dest='AB_img_path',type=str,default=None) ###kept for compatibility
+parser.add_argument('--Nodes_codes_center_save_path',type=str,default=None)
+parser.add_argument('--Nodes_connection_distance_save_path',type=str,default=None)
+parser.add_argument('--image_class_associated_codes_path','--latent_csv',dest='image_class_associated_codes_path',type=str,default='CL_Analysis/results/testAB_CL_codes_extraction_results.csv')
+parser.add_argument('--shortest_path_save_path',type=str,default=None)
+parser.add_argument('--source_image',type=str,default='z_86_01567.png')
+parser.add_argument('--target_image',type=str,default='z_86_01318.png')
 opts = parser.parse_args()
 
 ##For those pair points(images) whose shortest paths will be calculated, the start points(images) are listed in the "A_img_name_list" while the end points(images) are listed in the "B_img_name_list"
 ###For example
-A_img_name_list=['z_86_01567.png']
-B_img_name_list=['z_86_01318.png']
+A_img_name_list=[opts.source_image]
+B_img_name_list=[opts.target_image]
 
 ##For each node in the graph, the center vector(mean values) of all class-association codes involved into this node were recorded in this file
-Nodes_codes_center_save_path=opts.Nodes_codes_center_save_path
+Nodes_codes_center_save_path=opts.Nodes_codes_center_save_path or os.path.join(opts.output_dir, 'Nodes_codes_center.csv')
 
 ##The distance between each two nodes in the graph were recorded in this file
-Nodes_connection_distance_save_path=opts.Nodes_connection_distance_save_path
+Nodes_connection_distance_save_path=opts.Nodes_connection_distance_save_path or os.path.join(opts.output_dir, 'Nodes_connection_distance.csv')
 
 ##The class-associated codes of the images were recorded in this file
 image_class_associated_codes_path=opts.image_class_associated_codes_path
 
 ##For each two images(points), their corresponding nodes and the shortest paths will be recorded in this file
-shortest_path_save_path=opts.shortest_path_save_path
+shortest_path_save_path=opts.shortest_path_save_path or os.path.join(opts.output_dir, 'AB_images_shortest_path_save.csv')
+os.makedirs(os.path.dirname(os.path.abspath(shortest_path_save_path)), exist_ok=True)
 
 
 AB_img_path=opts.AB_img_path
@@ -145,4 +151,3 @@ with open(shortest_path_save_path,"w",newline="") as csvfile:
 
         row_list=[A_img_name,B_img_name,A_node,B_node,path_str,str(distance_AB)]
         writer.writerow(row_list)
-
